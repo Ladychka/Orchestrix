@@ -1,0 +1,14 @@
+[
+  {"name": "ProBook 15-inch Laptop", "sku": "SKU-101", "unit_price": 899.0, "stock_quantity": 45},
+  {"name": "UltraSlim 13-inch Laptop", "sku": "SKU-102", "unit_price": 1299.0, "stock_quantity": 12},
+  {"name": "Gaming Beast 17-inch Laptop", "sku": "SKU-103", "unit_price": 2199.0, "stock_quantity": 8},
+  {"name": "Business Desktop Tower", "sku": "SKU-201", "unit_price": 749.0, "stock_quantity": 30},
+  {"name": "Compact Mini PC", "sku": "SKU-202", "unit_price": 499.0, "stock_quantity": 55},
+  {"name": "27-inch 4K Monitor", "sku": "SKU-301", "unit_price": 349.0, "stock_quantity": 120},
+  {"name": "Mechanical Keyboard RGB", "sku": "SKU-401", "unit_price": 129.0, "stock_quantity": 200},
+  {"name": "Wireless Ergonomic Mouse", "sku": "SKU-402", "unit_price": 79.0, "stock_quantity": 150},
+  {"name": "USB-C Docking Station", "sku": "SKU-501", "unit_price": 199.0, "stock_quantity": 40},
+  {"name": "Webcam Full HD 1080p", "sku": "SKU-601", "unit_price": 89.0, "stock_quantity": 85},
+  {"name": "Noise Cancelling Headset", "sku": "SKU-602", "unit_price": 249.0, "stock_quantity": 60},
+  {"name": "External SSD 1TB", "sku": "SKU-701", "unit_price": 119.0, "stock_quantity": 110}
+]
