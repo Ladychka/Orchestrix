@@ -23,15 +23,31 @@ interface Task {
   updated_at: string | null;
 }
 
-const STATUS_COLORS: Record<TaskStatus, string> = {
-  received: 'bg-blue-100 text-blue-800',
-  processing: 'bg-yellow-100 text-yellow-800',
-  awaiting_approval: 'bg-orange-100 text-orange-800',
-  approved: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-800',
-  completed: 'bg-emerald-100 text-emerald-800',
-  failed: 'bg-gray-200 text-gray-800',
+const STATUS_STYLES: Record<TaskStatus, { bg: string; text: string; label: string }> = {
+  received: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Received' },
+  processing: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Processing' },
+  awaiting_approval: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Awaiting Approval' },
+  approved: { bg: 'bg-green-100', text: 'text-green-800', label: 'Approved' },
+  rejected: { bg: 'bg-red-100', text: 'text-red-800', label: 'Rejected' },
+  completed: { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Completed' },
+  failed: { bg: 'bg-gray-200', text: 'text-gray-800', label: 'Failed' },
 };
+
+function StatusBadge({ status }: { status: TaskStatus }) {
+  const style = STATUS_STYLES[status];
+  const isLive = status === 'processing' || status === 'received';
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text}`}>
+      {isLive && (
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+        </span>
+      )}
+      {style.label}
+    </span>
+  );
+}
 
 export default function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -67,61 +83,81 @@ export default function HomePage() {
     setLoading(false);
   }
 
+  const activeCount = tasks.filter(t => t.status === 'processing' || t.status === 'received').length;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Tasks</h2>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-bold text-gray-900">Tasks</h2>
+          {activeCount > 0 && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-yellow-700 bg-yellow-50 px-2.5 py-1 rounded-full">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+              </span>
+              {activeCount} active
+            </span>
+          )}
+        </div>
         <button
           onClick={triggerDemo}
           disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Triggering…' : 'Trigger Demo Task'}
         </button>
       </div>
 
-      <div className="bg-white rounded shadow overflow-hidden">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-gray-100 text-gray-600">
-            <tr>
-              <th className="px-4 py-3 font-medium">ID</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Trigger</th>
-              <th className="px-4 py-3 font-medium">Created</th>
-              <th className="px-4 py-3 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {tasks.map((t) => (
-              <tr key={t.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">{t.id}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-block px-2 py-1 rounded text-xs font-medium ${STATUS_COLORS[t.status]}`}
-                  >
-                    {t.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3">{t.trigger_source}</td>
-                <td className="px-4 py-3">
-                  {new Date(t.created_at).toLocaleString()}
-                </td>
-                <td className="px-4 py-3">
-                  <Link href={`/tasks/${t.id}`} className="text-blue-600 hover:underline">
-                    View trace
-                  </Link>
-                </td>
-              </tr>
-            ))}
-            {tasks.length === 0 && (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-gray-50 text-gray-600">
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
-                  No tasks yet. Click "Trigger Demo Task" to start.
-                </td>
+                <th className="px-4 py-3 font-semibold">ID</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold">Trigger</th>
+                <th className="px-4 py-3 font-semibold">Created</th>
+                <th className="px-4 py-3 font-semibold text-right"></th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {tasks.map((t) => (
+                <tr key={t.id} className="hover:bg-gray-50 transition">
+                  <td className="px-4 py-3 font-medium text-gray-900">#{t.id}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={t.status} />
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 capitalize">{t.trigger_source}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">
+                    {new Date(t.created_at).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={`/tasks/${t.id}`}
+                      className="text-blue-600 hover:text-blue-800 font-medium text-sm transition"
+                    >
+                      View trace →
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+              {tasks.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3 text-gray-500">
+                      <svg className="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      <p className="text-sm">No tasks yet.</p>
+                      <p className="text-xs">Click "Trigger Demo Task" to start your first quotation workflow.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

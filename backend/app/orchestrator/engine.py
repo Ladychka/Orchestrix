@@ -148,7 +148,7 @@ def run_task(task_id: int) -> None:
             return
 
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel(model_name="gemini-1.5-flash-latest")
+        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
 
         contents = [
             {"role": "user", "parts": [{"text": system_prompt + "\n\n" + user_text}]}
