@@ -29,10 +29,14 @@ def test_calculate_quote():
 def test_draft_quotation_email():
     print("\n=== test_draft_quotation_email ===")
     quote = calculate_quote([{"sku": "SKU-101", "quantity": 50}])
-    body = draft_quotation_email("test@example.com", quote)
-    print(body[:300] + "...")
-    assert "Total:" in body
-    assert "AI Finance Officer" in body
+    result = draft_quotation_email("test@example.com", quote)
+    assert isinstance(result, dict), "Expected dict with text/html keys"
+    text = result.get("text", "")
+    html = result.get("html", "")
+    print(text[:300] + "...")
+    assert "TOTAL:" in text
+    assert "AI Finance Officer" in text
+    assert "<html>" in html or "<table>" in html, "Expected HTML table in html version"
 
 
 def test_send_email():

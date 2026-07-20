@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     EMAIL_USER: str = ""
     EMAIL_PASS: str = ""
 
+    # Ollama (replaces Gemini)
+    OLLAMA_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "kimi-k2.6:cloud"
+
     class Config:
         env_file = ".env"
 

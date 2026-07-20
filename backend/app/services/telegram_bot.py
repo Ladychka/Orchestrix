@@ -74,7 +74,13 @@ async def _approve_callback(update, context):
         )
         email_body = ""
         if draft_step and draft_step.tool_output:
-            email_body = draft_step.tool_output.get("result", "")
+            out = draft_step.tool_output
+            if isinstance(out, dict):
+                email_body = out
+            elif isinstance(out, str):
+                email_body = out
+            else:
+                email_body = "Your quotation is attached."
         if not email_body:
             email_body = "Your quotation is attached."
 
@@ -95,12 +101,18 @@ async def _approve_callback(update, context):
                     "tool_output": {"sent": True},
                 },
             )
-            await query.edit_message_text(f"✅ Approved and email sent for task #{task_id}")
+            await query.edit_message_text(
+                f"✅ <b>Task #{task_id} Approved</b>\n\n"
+                f"The quotation has been approved and the email has been sent to the customer.",
+                parse_mode="HTML",
+            )
         else:
             task.status = TaskStatus.failed
             db.commit()
             await query.edit_message_text(
-                f"⚠️ Approved but email failed for task #{task_id}"
+                f"⚠️ <b>Task #{task_id} — Email Failed</b>\n\n"
+                f"Approved successfully, but the email could not be sent. Please check SMTP settings.",
+                parse_mode="HTML",
             )
     finally:
         db.close()
@@ -142,13 +154,78 @@ async def _reject_callback(update, context):
             },
         )
 
-        await query.edit_message_text(f"❌ Rejected task #{task_id}")
+        await query.edit_message_text(
+            f"❌ <b>Task #{task_id} Rejected</b>\n\n"
+            f"The quotation was rejected. No email was sent to the customer.",
+            parse_mode="HTML",
+        )
     finally:
         db.close()
 
 
+def _format_telegram_summary(raw_summary: str) -> str:
+    """Parse the LLM summary into structured bullet points for Telegram HTML."""
+    import re
+
+    text = raw_summary.strip()
+    bullets = []
+
+    # Extract email
+    email_match = re.search(r'([\w.-]+@[\w.-]+\.[A-Za-z]{2,})', text)
+    if email_match:
+        bullets.append(f"• 👤 Customer: <b>{email_match.group(1)}</b>")
+
+    # Extract product + SKU — pattern: "X units of Product (SKU-YYY)" or "Product (SKU-YYY)"
+    product_match = re.search(r'(\d+)\s+units?\s+of\s+([^(]+)\s*\((SKU-\d+)\)', text, re.IGNORECASE)
+    if product_match:
+        qty = product_match.group(1)
+        product = product_match.group(2).strip()
+        sku = product_match.group(3)
+        bullets.append(f"• 📦 Product: <b>{product}</b> (<b>{sku}</b>)")
+        bullets.append(f"• 📊 Quantity: <b>{qty} units</b>")
+    else:
+        # Fallback: just extract SKU
+        sku_match = re.search(r'(SKU-\d+)', text)
+        if sku_match:
+            bullets.append(f"• 🏷️ SKU: <b>{sku_match.group(1)}</b>")
+
+    # Extract unit price
+    unit_price_match = re.search(r'[Uu]nit\s+price\s+[:$]?\s*(\$[\d,.]+)', text)
+    if unit_price_match:
+        bullets.append(f"• 💵 Unit Price: <code>{unit_price_match.group(1)}</code>")
+
+    # Extract discount
+    discount_match = re.search(r'[Dd]iscount\s+[:$]?\s*(\$[\d,.]+(?:\.\d{2})?)', text)
+    if discount_match:
+        bullets.append(f"• 🏷️ Bulk Discount: <code>-{discount_match.group(1)}</code>")
+
+    # Extract total — pattern: "Total: $X" or "total $X USD"
+    total_match = re.search(r'[Tt]otal[:\s]+(\$[\d,.]+(?:\.\d{2})?)\s*(USD)?', text)
+    if total_match:
+        currency = total_match.group(2) or "USD"
+        bullets.append(f"• 💰 Total: <code>{total_match.group(1)} {currency}</code>")
+
+    # Extract stock/note warning
+    note_match = re.search(r'[Nn]ote[:\s]+(.+?)(?:\.|$)', text)
+    if note_match:
+        note_text = note_match.group(1).strip()
+        bullets.append(f"\n⚠️ <b>Warning:</b> {note_text}")
+    elif re.search(r'stock\s+is\s+(?:only\s+)?(\d+)', text, re.IGNORECASE):
+        stock_num = re.search(r'stock\s+is\s+(?:only\s+)?(\d+)', text, re.IGNORECASE).group(1)
+        bullets.append(f"\n⚠️ <b>Stock Alert:</b> Only {stock_num} units available in inventory.")
+
+    # If we couldn't parse anything, fall back to the original text as a single bullet
+    if not bullets:
+        text = re.sub(r'(\$[\d,]+\.\d{2})', r'<code>\1</code>', text)
+        text = re.sub(r'(SKU-\d+)', r'<b>\1</b>', text)
+        text = re.sub(r'([\w.-]+@[\w.-]+\.[A-Za-z]{2,})', r'<b>\1</b>', text)
+        return f"• {text}"
+
+    return "\n".join(bullets)
+
+
 def notify_approval_request(task_id: int, summary: str):
-    """Send an approval request message to the configured approver chat."""
+    """Send a beautifully formatted approval request message to the configured approver chat."""
     if not _application or not _bot_loop or not _APPROVER_CHAT_ID:
         print(
             f"[telegram_bot] Cannot notify for task {task_id}: "
@@ -159,17 +236,30 @@ def notify_approval_request(task_id: int, summary: str):
     async def _send():
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+        formatted = _format_telegram_summary(summary)
+
+        message = (
+            f"🔔 <b>APPROVAL REQUEST — Task #{task_id}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📋 <b>Quotation Summary</b>\n"
+            f"{formatted}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"<i>Please choose an action:</i>"
+        )
+
         keyboard = [
             [
-                InlineKeyboardButton("✅ Approve", callback_data=f"approve:{task_id}"),
+                InlineKeyboardButton("✅ Approve & Send", callback_data=f"approve:{task_id}"),
                 InlineKeyboardButton("❌ Reject", callback_data=f"reject:{task_id}"),
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
+
         await _application.bot.send_message(
             chat_id=_APPROVER_CHAT_ID,
-            text=f"🔔 Approval Request for Task #{task_id}\n\n{summary}",
+            text=message,
             reply_markup=reply_markup,
+            parse_mode="HTML",
         )
 
     asyncio.run_coroutine_threadsafe(_send(), _bot_loop)

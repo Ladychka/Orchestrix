@@ -16,8 +16,8 @@ class TaskStepOut(BaseModel):
     id: int
     step_number: int
     tool_called: str | None
-    tool_input: dict[str, Any]
-    tool_output: dict[str, Any]
+    tool_input: Any
+    tool_output: Any
     created_at: datetime
 
     class Config:

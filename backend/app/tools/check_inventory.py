@@ -13,5 +13,13 @@ def check_inventory(product_query: str) -> list[dict]:
         List of product dicts with keys: name, sku, unit_price, stock_quantity.
     """
     svc = QdrantService()
+
+    # Exact SKU lookup when query looks like an SKU code
+    query = product_query.strip().upper()
+    if query.startswith("SKU-"):
+        exact = svc.lookup_by_sku(query)
+        if exact:
+            return [exact]
+
     results = svc.search(query=product_query, top_k=5)
     return results

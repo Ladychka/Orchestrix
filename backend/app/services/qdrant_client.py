@@ -4,7 +4,7 @@ import os
 from typing import Any
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct
+from qdrant_client.models import PointStruct, FieldCondition, MatchValue, Filter
 from sentence_transformers import SentenceTransformer
 
 COLLECTION_NAME = "finance_officer_knowledge"
@@ -35,6 +35,29 @@ class QdrantService:
             }
             for r in results
         ]
+
+    def lookup_by_sku(self, sku: str) -> dict[str, Any] | None:
+        """Exact SKU lookup via payload filter (not semantic search)."""
+        results = self.client.scroll(
+            collection_name=COLLECTION_NAME,
+            scroll_filter=Filter(
+                must=[FieldCondition(key="sku", match=MatchValue(value=sku))]
+            ),
+            limit=1,
+            with_payload=True,
+            with_vectors=False,
+        )
+        points = results[0]
+        if not points:
+            return None
+        p = points[0]
+        return {
+            "id": p.id,
+            "name": p.payload.get("name"),
+            "sku": p.payload.get("sku"),
+            "unit_price": p.payload.get("unit_price"),
+            "stock_quantity": p.payload.get("stock_quantity"),
+        }
 
     def upsert(self, records: list[dict[str, Any]], start_id: int = 0):
         points = []

@@ -2,17 +2,18 @@
 
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 from app.core.config import settings
 
 
-def send_email(to: str, subject: str, body: str) -> bool:
+def send_email(to: str, subject: str, body: str | dict) -> bool:
     """Send an email using the configured SMTP credentials.
 
     Args:
         to: Recipient email address.
         subject: Email subject line.
-        body: Plain-text email body.
+        body: Either a plain string, or a dict with 'text' and 'html' keys.
 
     Returns:
         True if sent successfully, False otherwise.
@@ -22,10 +23,18 @@ def send_email(to: str, subject: str, body: str) -> bool:
         return False
 
     try:
-        msg = MIMEText(body, "plain", "utf-8")
+        msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = settings.EMAIL_USER
+        msg["From"] = f"AI Finance Officer <{settings.EMAIL_USER}>"
         msg["To"] = to
+
+        if isinstance(body, dict) and "html" in body:
+            # Multipart: plain text + HTML
+            msg.attach(MIMEText(body.get("text", ""), "plain", "utf-8"))
+            msg.attach(MIMEText(body["html"], "html", "utf-8"))
+        else:
+            # Fallback: plain text only
+            msg.attach(MIMEText(str(body), "plain", "utf-8"))
 
         with smtplib.SMTP(settings.EMAIL_HOST, settings.EMAIL_PORT) as server:
             server.starttls()

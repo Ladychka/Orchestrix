@@ -21,9 +21,9 @@ def calculate_quote(items: list[dict]) -> dict:
         sku = item.get("sku")
         quantity = item.get("quantity", 0)
 
-        # Lookup exact SKU via Qdrant
-        hits = svc.search(query=sku, top_k=1)
-        if not hits:
+        # Lookup exact SKU via payload filter (not semantic search)
+        product = svc.lookup_by_sku(sku)
+        if not product:
             line_items.append({
                 "sku": sku,
                 "quantity": quantity,
@@ -32,8 +32,6 @@ def calculate_quote(items: list[dict]) -> dict:
                 "note": "Product not found",
             })
             continue
-
-        product = hits[0]
         unit_price = float(product.get("unit_price", 0))
         subtotal = unit_price * quantity
 

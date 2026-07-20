@@ -12,7 +12,9 @@ COLLECTION_NAME = "finance_officer_knowledge"
 MODEL_NAME = "all-MiniLM-L6-v2"
 
 
-def load_products(path: str = "products.json") -> list[dict]:
+def load_products(path: str | None = None) -> list[dict]:
+    if path is None:
+        path = os.path.join(os.path.dirname(__file__), "products.json")
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
