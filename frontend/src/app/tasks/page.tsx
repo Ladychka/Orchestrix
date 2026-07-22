@@ -1,20 +1,27 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import {
+  ArrowLeft,
+  Search,
+  ListFilter,
   Clock,
   Bot,
   Hand,
+  ShieldCheck,
+  Shield,
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  Filter,
-  ArrowLeft,
-  Search,
-} from 'lucide-react';
+} from 'lucide-react'
 
-const API_BASE = '/api';
+import { cn } from '@/lib/utils'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+
+const API_BASE = '/api'
 
 type TaskStatus =
   | 'received'
@@ -23,26 +30,68 @@ type TaskStatus =
   | 'approved'
   | 'rejected'
   | 'completed'
-  | 'failed';
+  | 'failed'
 
 interface Task {
-  id: number;
-  employee_id: number;
-  trigger_source: string;
-  status: TaskStatus;
-  created_at: string;
-  updated_at: string | null;
+  id: number
+  employee_id: number
+  trigger_source: string
+  status: TaskStatus
+  created_at: string
+  updated_at: string | null
 }
 
-const STATUS_STYLES: Record<TaskStatus, { bg: string; text: string; border: string; label: string; icon: any }> = {
-  received: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200', label: 'Received', icon: Clock },
-  processing: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', label: 'Processing', icon: Bot },
-  awaiting_approval: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', label: 'Awaiting Approval', icon: Hand },
-  approved: { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', label: 'Approved', icon: CheckCircle2 },
-  rejected: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', label: 'Rejected', icon: XCircle },
-  completed: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', label: 'Completed', icon: CheckCircle2 },
-  failed: { bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-200', label: 'Failed', icon: AlertTriangle },
-};
+const STATUS_CONFIG: Record<
+  TaskStatus,
+  {
+    label: string
+    icon: React.ElementType
+    classes: string
+  }
+> = {
+  received: {
+    label: 'Received',
+    icon: Clock,
+    classes:
+      'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700',
+  },
+  processing: {
+    label: 'Processing',
+    icon: Bot,
+    classes:
+      'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800',
+  },
+  awaiting_approval: {
+    label: 'Awaiting Approval',
+    icon: Hand,
+    classes:
+      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800',
+  },
+  approved: {
+    label: 'Approved',
+    icon: ShieldCheck,
+    classes:
+      'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-800',
+  },
+  rejected: {
+    label: 'Rejected',
+    icon: XCircle,
+    classes:
+      'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800',
+  },
+  completed: {
+    label: 'Completed',
+    icon: CheckCircle2,
+    classes:
+      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800',
+  },
+  failed: {
+    label: 'Failed',
+    icon: AlertTriangle,
+    classes:
+      'bg-red-50 text-red-800 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800',
+  },
+}
 
 const ALL_STATUSES: TaskStatus[] = [
   'received',
@@ -52,143 +101,173 @@ const ALL_STATUSES: TaskStatus[] = [
   'rejected',
   'completed',
   'failed',
-];
+]
 
 function StatusBadge({ status }: { status: TaskStatus }) {
-  const style = STATUS_STYLES[status];
-  const Icon = style.icon;
-  const isLive = status === 'processing' || status === 'received' || status === 'awaiting_approval';
+  const config = STATUS_CONFIG[status]
+  const Icon = config.icon
+  const isLive =
+    status === 'processing' || status === 'received' || status === 'awaiting_approval'
+
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${style.bg} ${style.text} ${style.border}`}>
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border',
+        config.classes
+      )}
+    >
       {isLive && (
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-60"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-current"></span>
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-60" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-current" />
         </span>
       )}
       {!isLive && <Icon className="w-3 h-3" />}
-      {style.label}
+      {config.label}
     </span>
-  );
+  )
 }
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [filter, setFilter] = useState<TaskStatus | 'all'>('all');
-  const [search, setSearch] = useState('');
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [filter, setFilter] = useState<TaskStatus | 'all'>('all')
+  const [search, setSearch] = useState('')
 
   async function fetchTasks() {
-    const res = await fetch(`${API_BASE}/tasks`);
-    if (res.ok) {
-      const data = await res.json();
-      setTasks(data);
+    try {
+      const res = await fetch(`${API_BASE}/tasks`)
+      if (res.ok) {
+        const data = await res.json()
+        setTasks(data)
+      }
+    } catch {
+      // network hiccups are fine, we'll retry in 3s
     }
   }
 
   useEffect(() => {
-    fetchTasks();
-    const interval = setInterval(fetchTasks, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    fetchTasks()
+    const interval = setInterval(fetchTasks, 3000)
+    return () => clearInterval(interval)
+  }, [])
 
   const filteredTasks = tasks.filter((t) => {
-    const matchesStatus = filter === 'all' || t.status === filter;
+    const matchesStatus = filter === 'all' || t.status === filter
     const matchesSearch =
       search === '' ||
       t.id.toString().includes(search) ||
       t.status.toLowerCase().includes(search.toLowerCase()) ||
-      t.trigger_source.toLowerCase().includes(search.toLowerCase());
-    return matchesStatus && matchesSearch;
-  });
+      t.trigger_source.toLowerCase().includes(search.toLowerCase())
+    return matchesStatus && matchesSearch
+  })
 
-  const statusCounts = ALL_STATUSES.reduce((acc, status) => {
-    acc[status] = tasks.filter((t) => t.status === status).length;
-    return acc;
-  }, {} as Record<TaskStatus, number>);
+  // build counts for each status so filter chips show real numbers
+  const statusCounts = ALL_STATUSES.reduce(
+    (acc, status) => {
+      acc[status] = tasks.filter((t) => t.status === status).length
+      return acc
+    },
+    {} as Record<TaskStatus, number>
+  )
 
   return (
     <div className="space-y-6">
-      <Link href="/" className="inline-flex items-center text-primary hover:text-primary-hover text-sm font-medium transition">
-        <ArrowLeft className="w-4 h-4 mr-1" /> Back to overview
+      <Link
+        href="/"
+        className="inline-flex items-center text-sm font-medium text-primary hover:underline transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4 mr-1" />
+        Back to overview
       </Link>
 
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <h2 className="text-2xl font-semibold text-heading tracking-tight">All Tasks</h2>
-        <span className="text-sm text-muted">{tasks.length} total</span>
+        <h2 className="text-2xl font-semibold tracking-tight">All Tasks</h2>
+        <span className="text-sm text-muted-foreground">{tasks.length} total</span>
       </div>
 
       {/* Filters */}
-      <div className="bg-card rounded-xl shadow-sm border border-border p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-            <input
-              type="text"
-              placeholder="Search by ID, status, or trigger…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-lg border border-border bg-page text-sm text-heading placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-            />
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="w-4 h-4 text-muted shrink-0" />
-            <button
-              onClick={() => setFilter('all')}
-              className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition ${
-                filter === 'all'
-                  ? 'bg-primary text-white border-primary'
-                  : 'bg-page text-body border-border hover:border-primary/30'
-              }`}
-            >
-              All ({tasks.length})
-            </button>
-            {ALL_STATUSES.map((status) => (
-              <button
-                key={status}
-                onClick={() => setFilter(status)}
-                className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition ${
-                  filter === status
-                    ? 'bg-primary text-white border-primary'
-                    : 'bg-page text-body border-border hover:border-primary/30'
-                }`}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search by ID, status, or trigger..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <ListFilter className="w-4 h-4 text-muted-foreground shrink-0" />
+              <Button
+                variant={filter === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilter('all')}
+                className="text-xs h-8"
               >
-                {STATUS_STYLES[status].label} ({statusCounts[status]})
-              </button>
-            ))}
+                All ({tasks.length})
+              </Button>
+              {ALL_STATUSES.map((status) => (
+                <Button
+                  key={status}
+                  variant={filter === status ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFilter(status)}
+                  className="text-xs h-8"
+                >
+                  {STATUS_CONFIG[status].label} ({statusCounts[status]})
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Tasks Table */}
-      <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+      <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-page text-muted">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
               <tr>
-                <th className="px-4 py-3 font-semibold text-xs uppercase tracking-wider">ID</th>
-                <th className="px-4 py-3 font-semibold text-xs uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 font-semibold text-xs uppercase tracking-wider">Trigger</th>
-                <th className="px-4 py-3 font-semibold text-xs uppercase tracking-wider">Created</th>
-                <th className="px-4 py-3 font-semibold text-xs uppercase tracking-wider text-right"></th>
+                <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+                  ID
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+                  Trigger
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+                  Created
+                </th>
+                <th className="px-4 py-3 text-right"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filteredTasks.map((t) => (
-                <tr key={t.id} className="hover:bg-page transition">
-                  <td className="px-4 py-3 font-medium text-heading">#{t.id}</td>
+                <tr
+                  key={t.id}
+                  className="hover:bg-muted/40 transition-colors"
+                >
+                  <td className="px-4 py-3 font-medium">#{t.id}</td>
                   <td className="px-4 py-3">
                     <StatusBadge status={t.status} />
                   </td>
-                  <td className="px-4 py-3 text-body capitalize">{t.trigger_source}</td>
-                  <td className="px-4 py-3 text-muted text-xs">
+                  <td className="px-4 py-3 text-muted-foreground capitalize">
+                    {t.trigger_source}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">
                     {new Date(t.created_at).toLocaleString()}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link
                       href={`/tasks/${t.id}`}
-                      className="text-primary hover:text-primary-hover font-medium text-sm transition"
+                      className="text-primary hover:underline font-medium text-sm"
                     >
-                      View trace →
+                      View trace
                     </Link>
                   </td>
                 </tr>
@@ -196,15 +275,20 @@ export default function TasksPage() {
               {filteredTasks.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center">
-                    <div className="flex flex-col items-center gap-3 text-muted">
+                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
                       <Search className="w-10 h-10" />
                       <p className="text-sm">No tasks match your filters.</p>
-                      <button
-                        onClick={() => { setFilter('all'); setSearch(''); }}
-                        className="text-primary hover:text-primary-hover text-xs font-medium transition"
+                      <Button
+                        variant="link"
+                        size="sm"
+                        onClick={() => {
+                          setFilter('all')
+                          setSearch('')
+                        }}
+                        className="text-xs font-medium"
                       >
                         Clear filters
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -212,7 +296,7 @@ export default function TasksPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </div>
-  );
+  )
 }

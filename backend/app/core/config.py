@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     OLLAMA_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "kimi-k2.6:cloud"
 
+    # Approval escalation
+    APPROVAL_TIMEOUT_HOURS: int = 4
+    APPROVAL_ESCALATION_HOURS: int = 8
+
     class Config:
         env_file = ".env"
 

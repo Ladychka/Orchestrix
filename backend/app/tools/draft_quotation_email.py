@@ -53,7 +53,7 @@ def draft_quotation_email(customer_email: str, quote: dict) -> dict:
         "</head>\n"
         "<body>\n"
         f'  <div class="header">\n'
-        f'    <h1>📋 Quotation from AI Finance Officer</h1>\n'
+        f'    <h1>Quotation from AI Finance Officer</h1>\n'
         f'    <p>Ref: {today} — {customer_email}</p>\n'
         f'  </div>\n'
         f'  <div class="content">\n'
@@ -78,7 +78,7 @@ def draft_quotation_email(customer_email: str, quote: dict) -> dict:
         note = item.get("note", "")
         if note:
             lines.append(f"  • {item['sku']}: {note}")
-            html_lines.append(f"        <tr><td colspan='6' style='color:#DC2626'>⚠️ {item['sku']}: {note}</td></tr>\n")
+            html_lines.append(f"        <tr><td colspan='6' style='color:#DC2626'>[WARNING] {item['sku']}: {note}</td></tr>\n")
         else:
             name = item.get('name', '')
             sku = item.get('sku', '')

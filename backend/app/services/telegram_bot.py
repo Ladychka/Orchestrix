@@ -1,4 +1,7 @@
-"""Telegram Bot service — approval workflow with inline Approve/Reject buttons."""
+"""Telegram Bot service — approval workflow with inline Approve/Reject buttons.
+
+No emojis in messages — replaced with plain text indicators for consistency.
+"""
 
 import asyncio
 from datetime import datetime
@@ -102,7 +105,7 @@ async def _approve_callback(update, context):
                 },
             )
             await query.edit_message_text(
-                f"✅ <b>Task #{task_id} Approved</b>\n\n"
+                f"<b>Task #{task_id} Approved</b>\n\n"
                 f"The quotation has been approved and the email has been sent to the customer.",
                 parse_mode="HTML",
             )
@@ -110,7 +113,7 @@ async def _approve_callback(update, context):
             task.status = TaskStatus.failed
             db.commit()
             await query.edit_message_text(
-                f"⚠️ <b>Task #{task_id} — Email Failed</b>\n\n"
+                f"<b>Task #{task_id} — Email Failed</b>\n\n"
                 f"Approved successfully, but the email could not be sent. Please check SMTP settings.",
                 parse_mode="HTML",
             )
@@ -155,7 +158,7 @@ async def _reject_callback(update, context):
         )
 
         await query.edit_message_text(
-            f"❌ <b>Task #{task_id} Rejected</b>\n\n"
+            f"<b>Task #{task_id} Rejected</b>\n\n"
             f"The quotation was rejected. No email was sent to the customer.",
             parse_mode="HTML",
         )
@@ -173,7 +176,7 @@ def _format_telegram_summary(raw_summary: str) -> str:
     # Extract email
     email_match = re.search(r'([\w.-]+@[\w.-]+\.[A-Za-z]{2,})', text)
     if email_match:
-        bullets.append(f"• 👤 Customer: <b>{email_match.group(1)}</b>")
+        bullets.append(f"• Customer: <b>{email_match.group(1)}</b>")
 
     # Extract product + SKU — pattern: "X units of Product (SKU-YYY)" or "Product (SKU-YYY)"
     product_match = re.search(r'(\d+)\s+units?\s+of\s+([^(]+)\s*\((SKU-\d+)\)', text, re.IGNORECASE)
@@ -181,44 +184,44 @@ def _format_telegram_summary(raw_summary: str) -> str:
         qty = product_match.group(1)
         product = product_match.group(2).strip()
         sku = product_match.group(3)
-        bullets.append(f"• 📦 Product: <b>{product}</b> (<b>{sku}</b>)")
-        bullets.append(f"• 📊 Quantity: <b>{qty} units</b>")
+        bullets.append(f"• Product: <b>{product}</b> (<b>{sku}</b>)")
+        bullets.append(f"• Quantity: <b>{qty} units</b>")
     else:
         # Fallback: just extract SKU
         sku_match = re.search(r'(SKU-\d+)', text)
         if sku_match:
-            bullets.append(f"• 🏷️ SKU: <b>{sku_match.group(1)}</b>")
+            bullets.append(f"• SKU: <b>{sku_match.group(1)}</b>")
 
     # Extract unit price
     unit_price_match = re.search(r'[Uu]nit\s+price\s+[:$]?\s*(\$[\d,.]+)', text)
     if unit_price_match:
-        bullets.append(f"• 💵 Unit Price: <code>{unit_price_match.group(1)}</code>")
+        bullets.append(f"• Unit Price: <code>{unit_price_match.group(1)}</code>")
 
     # Extract discount
     discount_match = re.search(r'[Dd]iscount\s+[:$]?\s*(\$[\d,.]+(?:\.\d{2})?)', text)
     if discount_match:
-        bullets.append(f"• 🏷️ Bulk Discount: <code>-{discount_match.group(1)}</code>")
+        bullets.append(f"• Bulk Discount: <code>-{discount_match.group(1)}</code>")
 
     # Extract total — pattern: "Total: $X" or "total $X USD"
     total_match = re.search(r'[Tt]otal[:\s]+(\$[\d,.]+(?:\.\d{2})?)\s*(USD)?', text)
     if total_match:
         currency = total_match.group(2) or "USD"
-        bullets.append(f"• 💰 Total: <code>{total_match.group(1)} {currency}</code>")
+        bullets.append(f"• Total: <code>{total_match.group(1)} {currency}</code>")
 
     # Extract stock/note warning
     note_match = re.search(r'[Nn]ote[:\s]+(.+?)(?:\.|$)', text)
     if note_match:
         note_text = note_match.group(1).strip()
-        bullets.append(f"\n⚠️ <b>Warning:</b> {note_text}")
+        bullets.append(f"\n<b>Warning:</b> {note_text}")
     elif re.search(r'stock\s+is\s+(?:only\s+)?(\d+)', text, re.IGNORECASE):
         stock_num = re.search(r'stock\s+is\s+(?:only\s+)?(\d+)', text, re.IGNORECASE).group(1)
-        bullets.append(f"\n⚠️ <b>Stock Alert:</b> Only {stock_num} units available in inventory.")
+        bullets.append(f"\n<b>Stock Alert:</b> Only {stock_num} units available in inventory.")
 
     # If we couldn't parse anything, fall back to the original text as a single bullet
     if not bullets:
-        text = re.sub(r'(\$[\d,]+\.\d{2})', r'<code>\1</code>', text)
-        text = re.sub(r'(SKU-\d+)', r'<b>\1</b>', text)
-        text = re.sub(r'([\w.-]+@[\w.-]+\.[A-Za-z]{2,})', r'<b>\1</b>', text)
+        text = re.sub(r'(\$[\d,]+\.\d{2})', r'\1', text)
+        text = re.sub(r'(SKU-\d+)', r'\1', text)
+        text = re.sub(r'([\w.-]+@[\w.-]+\.[A-Za-z]{2,})', r'\1', text)
         return f"• {text}"
 
     return "\n".join(bullets)
@@ -239,9 +242,9 @@ def notify_approval_request(task_id: int, summary: str):
         formatted = _format_telegram_summary(summary)
 
         message = (
-            f"🔔 <b>APPROVAL REQUEST — Task #{task_id}</b>\n"
+            f"<b>APPROVAL REQUEST — Task #{task_id}</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"📋 <b>Quotation Summary</b>\n"
+            f"<b>Quotation Summary</b>\n"
             f"{formatted}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
             f"<i>Please choose an action:</i>"
@@ -249,8 +252,8 @@ def notify_approval_request(task_id: int, summary: str):
 
         keyboard = [
             [
-                InlineKeyboardButton("✅ Approve & Send", callback_data=f"approve:{task_id}"),
-                InlineKeyboardButton("❌ Reject", callback_data=f"reject:{task_id}"),
+                InlineKeyboardButton("Approve & Send", callback_data=f"approve:{task_id}"),
+                InlineKeyboardButton("Reject", callback_data=f"reject:{task_id}"),
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)

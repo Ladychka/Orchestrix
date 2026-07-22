@@ -52,4 +52,4 @@ if __name__ == "__main__":
     test_calculate_quote()
     test_draft_quotation_email()
     test_send_email()
-    print("\n✅ All Phase 3 tool tests passed (where dependencies available).")
+    print("\n[PASS] All Phase 3 tool tests passed (where dependencies available).")

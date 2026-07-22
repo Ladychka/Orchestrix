@@ -1,7 +1,13 @@
-"""AI Orchestrator — Ollama chat loop for the AI Finance Officer."""
+"""AI Orchestrator — Ollama chat loop for the AI Finance Officer.
+
+Now resumable: conversation state (messages + step_number) is persisted to the
+Task row after every tool call. If the backend crashes and restarts, orphaned
+processing tasks are resumed from where they left off.
+"""
 
 import json
 import traceback
+from datetime import datetime
 from typing import Any
 
 from app.core.config import settings
@@ -112,6 +118,26 @@ def _build_system_prompt(employee: AIEmployee) -> str:
     )
 
 
+def _persist_conversation_state(
+    db,
+    task: Task,
+    messages: list[dict],
+    step_number: int,
+) -> None:
+    """Save the in-memory Ollama conversation so we can resume after a crash."""
+    task.conversation_state = {
+        "messages": messages,
+        "step_number": step_number,
+    }
+    db.commit()
+
+
+def _clear_conversation_state(db, task: Task) -> None:
+    """Wipe conversation state once a task reaches a terminal status."""
+    task.conversation_state = None
+    db.commit()
+
+
 def run_task(task_id: int) -> None:
     db = SessionLocal()
     try:
@@ -127,8 +153,9 @@ def run_task(task_id: int) -> None:
             db.commit()
             return
 
-        task.status = TaskStatus.processing
-        db.commit()
+        # If this task was resumed from a crash, mark it.
+        if task.conversation_state is not None:
+            task.resumed_at = datetime.utcnow()
 
         payload = task.input_payload or {}
         email_body = payload.get("body", "")
@@ -138,12 +165,25 @@ def run_task(task_id: int) -> None:
         system_prompt = _build_system_prompt(employee)
         user_text = f"From: {from_email}\nSubject: {subject}\n\n{email_body}"
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_text},
-        ]
+        # Resume from persisted state if available, otherwise start fresh.
+        if task.conversation_state:
+            state = task.conversation_state
+            messages = state.get("messages", [])
+            step_number = state.get("step_number", 0)
+            print(f"[run_task] Resuming task {task_id} at step {step_number}")
+            # Ensure the task status reflects that work is happening again.
+            if task.status != TaskStatus.processing:
+                task.status = TaskStatus.processing
+                db.commit()
+        else:
+            task.status = TaskStatus.processing
+            db.commit()
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_text},
+            ]
+            step_number = 0
 
-        step_number = 0
         max_iterations = 8
 
         for iteration in range(max_iterations):
@@ -156,6 +196,7 @@ def run_task(task_id: int) -> None:
                 print(f"[run_task] Ollama API error: {exc}")
                 traceback.print_exc()
                 task.status = TaskStatus.failed
+                _clear_conversation_state(db, task)
                 db.commit()
                 return
 
@@ -185,6 +226,7 @@ def run_task(task_id: int) -> None:
                     },
                 )
                 task.status = TaskStatus.completed
+                _clear_conversation_state(db, task)
                 db.commit()
                 return
 
@@ -218,6 +260,7 @@ def run_task(task_id: int) -> None:
                 messages.append({"role": "assistant", "content": content or json.dumps(tc)})
                 messages.append({"role": "user", "content": f"Error: {error_msg}"})
                 step_number += 1
+                _persist_conversation_state(db, task, messages, step_number)
                 continue
 
             # Special tool: request_approval
@@ -234,6 +277,7 @@ def run_task(task_id: int) -> None:
                     },
                 )
                 task.status = TaskStatus.awaiting_approval
+                _clear_conversation_state(db, task)
                 db.commit()
 
                 # Phase 5 notification hook
@@ -261,6 +305,7 @@ def run_task(task_id: int) -> None:
                 messages.append({"role": "assistant", "content": content or json.dumps(tc)})
                 messages.append({"role": "user", "content": f"Error: {error_msg}"})
                 step_number += 1
+                _persist_conversation_state(db, task, messages, step_number)
                 continue
 
             try:
@@ -288,10 +333,12 @@ def run_task(task_id: int) -> None:
                 {"role": "user", "content": f"Tool '{tool_name}' returned:\n{result_text}\n\nContinue with the next step."}
             )
             step_number += 1
+            _persist_conversation_state(db, task, messages, step_number)
             continue
 
         # Exceeded max iterations
         task.status = TaskStatus.failed
+        _clear_conversation_state(db, task)
         db.commit()
         print(f"[run_task] Max iterations ({max_iterations}) exceeded for task {task_id}")
 

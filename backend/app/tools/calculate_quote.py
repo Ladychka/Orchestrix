@@ -11,10 +11,12 @@ def calculate_quote(items: list[dict]) -> dict:
 
     Returns:
         Dict with line_items and total_price. Applies a 5%% bulk discount
-        on any line where quantity > 100.
+        on any line where quantity > 100. Also surfaces stock warnings
+        when requested quantity exceeds available inventory.
     """
     svc = QdrantService()
     line_items = []
+    stock_warnings = []
     total = 0.0
 
     for item in items:
@@ -29,10 +31,13 @@ def calculate_quote(items: list[dict]) -> dict:
                 "quantity": quantity,
                 "unit_price": 0.0,
                 "subtotal": 0.0,
+                "stock_quantity": 0,
                 "note": "Product not found",
             })
             continue
+
         unit_price = float(product.get("unit_price", 0))
+        stock_qty = int(product.get("stock_quantity", 0))
         subtotal = unit_price * quantity
 
         # Bulk discount: >100 units gets 5%% off that line
@@ -46,13 +51,26 @@ def calculate_quote(items: list[dict]) -> dict:
             "name": product.get("name", ""),
             "quantity": quantity,
             "unit_price": unit_price,
+            "stock_quantity": stock_qty,
             "discount": round(discount, 2),
             "subtotal": round(subtotal, 2),
         })
         total += subtotal
 
-    return {
+        # Flag when we don't have enough stock to fulfill the request
+        if quantity > stock_qty:
+            stock_warnings.append({
+                "sku": sku,
+                "requested": quantity,
+                "in_stock": stock_qty,
+            })
+
+    result = {
         "line_items": line_items,
         "total_price": round(total, 2),
         "currency": "USD",
     }
+    if stock_warnings:
+        result["stock_warnings"] = stock_warnings
+
+    return result

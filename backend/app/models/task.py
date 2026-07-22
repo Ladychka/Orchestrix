@@ -27,6 +27,8 @@ class Task(Base):
     status = Column(Enum(TaskStatus), default=TaskStatus.received, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    conversation_state = Column(JSON, nullable=True)
+    resumed_at = Column(DateTime(timezone=True), nullable=True)
 
     employee = relationship("AIEmployee", back_populates="tasks")
     steps = relationship("TaskStep", back_populates="task", cascade="all, delete-orphan")
